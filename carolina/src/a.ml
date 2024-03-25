@@ -51,14 +51,53 @@ let tally_fun ch u =
         tally u
 
 
+let update c theta =
+    let rec upd th =
+        match C.recv_poll c with 
+        | Some (Threshold t) -> th := t; upd th
+        | Some (Candidate t) -> upd th
+        | Some (Finished n) -> upd th
+        | None -> () in
+    let th = ref theta in
+    upd th; 
+    Printf.printf "update: %f -> %f\n" theta !th;
+    !th
+
+
 let worker_fun ch x i theta =
     fun () ->
         let rec worker i theta = 
             if i > Array.length x - 1 then
                 let _ = C.send ch.snd (Finished (Domain.self () :> int)) in ()
             else
-                worker (i + 1) theta in
+                let j = ref i in
+                let _ = while (!j < Array.length x - 1) && (x.(!j) >= theta) do j := !j + 1 done in
+                if x.(!j) < theta then
+                    let _ = C.send ch.snd (Candidate x.(!j)) in
+                    worker (!j + 1) (update ch.rcv theta)
+                else 
+                    worker (!j + 1) theta in
         worker i theta
+
+(* test worker_fun and tally_fun
+
+let a = C.make_unbounded ()
+let b = C.make_unbounded ()
+
+Random.init 13
+let k = 10
+let u = Array.init k (fun _ -> Random.float 1.0)
+let () = Array.sort Float.compare u
+let theta = u.(Array.length u - 1)
+
+Random.init 103
+let n = 15
+let x = Array.init n (fun _ -> Random.float 1.0)
+
+let tally_d = Domain.spawn(tally_fun {snd = a; rcv = b} u)
+let worker_d = Domain.spawn(worker_fun {snd = b; rcv = a} x 0 theta)
+
+*)
 
 (* test worker_fun
 
