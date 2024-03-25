@@ -1,0 +1,9 @@
+(executable
+ (name a)
+ (libraries domainslib)
+ (modules a))
+
+
+(executable
+ (name b)
+ (modules b))
