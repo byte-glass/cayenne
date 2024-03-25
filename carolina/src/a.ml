@@ -6,9 +6,9 @@
 rlwrap -a ocaml -noinit 
 ```
 
+
 ```ocaml
-#use "topfind"
-#require "domainslib"
+#use "src/a.ml"
 ```
 
 *)
@@ -51,20 +51,45 @@ let tally_fun ch u =
         tally u
 
 
-(*
+let worker_fun ch x i theta =
+    fun () ->
+        let rec worker i theta = 
+            if i > Array.length x - 1 then
+                let _ = C.send ch.snd (Finished (Domain.self () :> int)) in ()
+            else
+                worker (i + 1) theta in
+        worker i theta
+
+(* test worker_fun
+
+let a = C.make_unbounded ()
+let b = C.make_unbounded ()
+
+Random.init 103
+let n = 15
+let x = Array.init n (fun _ -> Random.float 1.0)
+
+let worker_d = Domain.spawn(worker_fun {snd = b; rcv = a} x 0 0.5)
+let sink_d = Domain.spawn(sink_fun b)
+
+Domain.join worker_d
+
+*)
+
+(* test tally_fun
 
 let a = C.make_unbounded ()
 let b = C.make_unbounded ()
 let ch = {snd = a; rcv = b}
 
 Random.init 13
-let n = 10
-let u = Array.init n (fun _ -> Random.float 1.0)
+let k = 10
+let u = Array.init k (fun _ -> Random.float 1.0)
 let () = Array.sort Float.compare u
 
 let tally_d = Domain.spawn(tally_fun {snd = a; rcv = b} u)
 
- Domain.spawn(fun _ -> C.send b (Finished 11))
+Domain.spawn(fun _ -> C.send b (Finished 11))
 
 Domain.spawn(fun _ -> C.send b (Candidate 0.2))
 let sink_d = Domain.spawn(sink_fun a)
