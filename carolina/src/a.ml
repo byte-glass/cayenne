@@ -20,10 +20,10 @@ open Domainslib
 
 module C = Domainslib.Chan
 
-type 'a message =  Threshold of 'a | Candidate of 'a | Finished of int
-(* type 'b threshold = Threshold of 'b  -- can't get this to work!! *)
+type 'a worker_message = Candidate of 'a | Finished of int
+type 'b tally_message = Threshold of 'b 
 
-type 'a channels = {snd : 'a C.t; rcv : 'a C.t}
+type ('a, 'b) channels = {snd : 'a C.t; rcv : 'b C.t}
 
 (* assume u < x.(Array.length x - 1) *)
 let insert x u =
@@ -44,10 +44,7 @@ let tally_fun ch u =
                     tally u
             | Finished id ->
                     Printf.printf "tally: finished %d\n" id;
-                    () 
-            | Threshold t -> 
-                    Printf.printf "tally: threshold!??\n"; 
-                    () in
+                    ()  in
         tally u
 
 
@@ -55,8 +52,6 @@ let update c theta =
     let rec upd th =
         match C.recv_poll c with 
         | Some (Threshold t) -> th := t; upd th
-        | Some (Candidate t) -> upd th
-        | Some (Finished n) -> upd th
         | None -> () in
     let th = ref theta in
     upd th; 
@@ -109,7 +104,7 @@ let n = 15
 let x = Array.init n (fun _ -> Random.float 1.0)
 
 let worker_d = Domain.spawn(worker_fun {snd = b; rcv = a} x 0 0.5)
-let sink_d = Domain.spawn(sink_fun b)
+let sink_d = Domain.spawn(sink_worker_fun b)
 
 Domain.join worker_d
 
@@ -131,23 +126,29 @@ let tally_d = Domain.spawn(tally_fun {snd = a; rcv = b} u)
 Domain.spawn(fun _ -> C.send b (Finished 11))
 
 Domain.spawn(fun _ -> C.send b (Candidate 0.2))
-let sink_d = Domain.spawn(sink_fun a)
+let sink_d = Domain.spawn(sink_tally_fun a)
 
 
 Domain.join tally_d
+Domain.join sink_d
 
 *)
 
+let sink_tally_fun c =
+    fun () ->
+        let rec sink c = 
+            match C.recv c with
+            | Threshold t -> 
+                    Printf.printf "sink: threshold %f\n" t;
+                    sink c in
+        sink c
 
-let sink_fun c =
+let sink_worker_fun c =
     fun () ->
         let rec sink c = 
         match C.recv c with
             | Candidate t ->
                     Printf.printf "sink: candidate %f\n" t;
-                    sink c
-            | Threshold t -> 
-                    Printf.printf "sink: threshold %f\n" t;
                     sink c
             | Finished id ->
                     Printf.printf "sink: finished %d\n" id;
