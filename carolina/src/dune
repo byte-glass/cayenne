@@ -1,0 +1,4 @@
+(executable
+ (name a)
+ (libraries easy_logging domainslib)
+ (modules a))
