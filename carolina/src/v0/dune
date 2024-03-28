@@ -1,0 +1,19 @@
+(executable
+ (name y)
+ (libraries easy_logging domainslib)
+ (modules y))
+
+(executable
+ (name z)
+ (libraries easy_logging domainslib)
+ (modules z))
+
+(executable
+ (name a)
+ (libraries easy_logging domainslib)
+ (modules a))
+
+
+(executable
+ (name b)
+ (modules b))

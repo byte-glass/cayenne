@@ -66,7 +66,7 @@ let update c theta id =
     !th
 
 
-let worker_fun ch x bounds i theta =
+let worker_fun ch x bounds theta =
     fun () ->
         let rec worker i theta = 
             if i >= bounds.upper then
