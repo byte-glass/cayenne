@@ -1,4 +1,4 @@
-(* b.ml *)
+(* d.ml *)
 
 (*
 #use "topfind"
@@ -7,7 +7,7 @@
 *)
 
 open Easy_logging
-let logger = Logging.make_logger "file_logger" Debug [File ("c", Debug)]
+let logger = Logging.make_logger "file_logger" Debug [File ("d", Debug)]
 
 module C = Domainslib.Chan
 
@@ -53,7 +53,7 @@ let insert u v =
     for j = Array.length u - 1 downto !i + 1 do u.(j) <- u.(j - 1) done;
     u.(!i) <- v
 
-let tally u x n =
+let _tally u x n =
     let rec aux a bs finished =
         match C.recv a with
         | Candidate t ->
@@ -81,25 +81,54 @@ next steps: rework tally into let k_least x k = ...
 and have the aux fun take just finished as its single argument
 *)
 
-let main () =
-    begin
-        let () = Random.init 103 and
-            k = 5 and
-            p = 10 and 
-            n = 2 in
-        let z = Array.init (k + n * p) (fun _ -> Random.float 1.0) in
-        let u = Array.init k (fun i -> z.(i)) in
-        let _ = Array.sort Float.compare u and
-            x = Array.init (n * p) (fun i -> z.(k + i)) in 
-        begin
-            tally u x n;
-            Array.sort Float.compare z;
-            Array.iter (fun i -> logger#debug "%f\t%f" u.(i) z.(i)) (Array.init k (fun i -> i));
-        end;
-        logger#debug "ok";
-        Printf.printf "ok\n"
+
+(* assume (Array.length x) - k is a multiple of w, it makes the arithmetic in the setup easier! *)
+
+let k_least k x w = 
+    let a = C.make_unbounded () and
+        bs = Array.init w (fun _ -> C.make_unbounded ()) and
+        p = ((Array.length x) - k) / w and
+        u = Array.init k (fun i -> x.(i)) in
+    let _ = Array.sort Float.compare u in
+    let rec aux finished =
+        match C.recv a with
+        | Candidate t ->
+                if t < last u then 
+                    insert u t
+                else
+                    logger#debug "worker: candidate %f too big" t;
+                Array.iter (fun b -> C.send b (Threshold (last u))) bs;
+                aux finished
+        | Finished id ->
+                logger#debug "tally: finished %d" id;
+                if List.length finished < Array.length bs - 1 then
+                    aux (id ::finished)
+                else
+                    () in
+    let workers = Array.init w (fun i -> Domain.spawn(worker {snd = a; rcv = bs.(i)} x {lower = k + i * p; upper = k + (i + 1) * p})) in begin
+        Array.iter (fun b -> C.send b (Threshold (last u))) bs;
+        aux [];
+        Array.iter (fun d -> Domain.join d) workers;
+        u
     end
 
+
+
+let main () = 
+    let k = 10 and
+        p = 1000 and
+        w = 4 in
+    let x = Array.init (k + w * p) (fun _ -> Random.float 1.0) in
+    let u = k_least k x w in begin
+        Array.sort Float.compare x;
+        for i = 0 to k - 1 do logger#debug "%f\t%f" u.(i) x.(i) done
+    end;
+    logger#debug "ok";
+    Printf.printf "ok\n"
+
+
+
 let _ = main ()
+
 
 (* end *)

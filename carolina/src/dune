@@ -13,3 +13,8 @@
  (libraries easy_logging domainslib)
  (modules c))
 
+(executable
+ (name d)
+ (libraries easy_logging domainslib)
+ (modules d))
+
